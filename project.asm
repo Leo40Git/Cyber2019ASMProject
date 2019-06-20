@@ -2,8 +2,7 @@
 .stack 100h
 
 .data
-
-; VARIABLES & CONSTANTS
+; VARIABLES
 
 ; buffer for itos subroutine
 ; used to store result
@@ -16,8 +15,8 @@ secret: db 4 dup(0)
 ; used in "you won! restart?" prompt
 reset_buf: db 2,?,2 dup(0)
 
+; CONSTANTS
 ; DOS strings (terminated by $)
-
 newline:
     db 0Dh,0Ah,'$'
 splash:
@@ -34,15 +33,15 @@ splash:
     db ' |                                                                 |',0Dh,0Ah
     db ' +-----------------------------------------------------------------+',0Dh,0Ah
     db 0Dh,0Ah
-    db 'Programmed by Kfir Awad',0Dh,0Ah
-    db 'for Cyber 2019 project',0Dh,0Ah
-    db 'using emu8086',0Dh,0Ah
+    db ' Programmed by Kfir Awad',0Dh,0Ah
+    db ' for Cyber 2019 project',0Dh,0Ah
+    db ' using emu8086',0Dh,0Ah
     db 0Dh,0Ah,'$'
 splash_2:
     db 'Press any key to start...$'
 secret_prompt:
     db 'Enter your secret number (4 digits): $'
-secret_bad:
+number_bad:
     db 0Dh,0Ah,'Follow the instructions!',0Dh,0Ah,'$'
 secret_ok:
     db 0Dh,0Ah,'Secret set! Starting game in 3...',0Dh,0Ah,'$'
@@ -68,7 +67,9 @@ prog_start:
     mov ds,ax
 
     ; set video mode
-    call vram_clear
+    mov al,3
+    mov ah,0
+    int 10h
     ; display splash screen
     lea dx,splash
     mov ah,9
@@ -86,7 +87,9 @@ prog_start:
     mov ah,7
     int 21h
 input_secret:
-    call vram_clear
+    mov al,3
+    mov ah,0
+    int 10h
     ; display secret prompt
     lea dx,secret_prompt
     mov ah,9
@@ -105,7 +108,7 @@ input_secret:
     jne chksec_ok
 ;chksec_bad:
     ; show error
-    lea dx,secret_bad
+    lea dx,number_bad
     mov ah,9
     int 21h
     mov cx,0Fh
@@ -149,7 +152,9 @@ chksec_ok:
     mov dx,4240h
     mov ah,86h
     int 15h
-    call vram_clear
+    mov al,3
+    mov ah,0
+    int 10h
 guess_input:
     ; display guess prompt
     lea dx,guess_prompt
@@ -170,7 +175,7 @@ chkguess:
     jne chkguess_ok
 ;chkguess_bad:
     ; show error
-    lea dx,secret_bad
+    lea dx,number_bad
     mov ah,9
     int 21h
     mov cx,0Fh
@@ -236,6 +241,10 @@ chkguess_ok:
     je input_secret 
     cmp al,'y' ; if choice is y, go to start of program
     je input_secret
+    ; clear screen
+    mov al,3
+    mov ah,0
+    int 10h
     ; exit program
     mov ah,4Ch
     int 21h
@@ -262,14 +271,6 @@ chkguess_ok:
     lea dx,guess_cows
     int 21h
     jmp guess_input
-
-; clears the screen
-; also initializes video mode
-PROC vram_clear
-    mov al,3
-    mov ah,0
-    int 10h
-ENDP vram_clear
 
 ; inputs:
 ;   AX - number to convert
