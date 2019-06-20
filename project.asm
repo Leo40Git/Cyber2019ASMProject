@@ -2,11 +2,8 @@
 .stack 100h
 
 .data
-; VARIABLES
+; VARIABLES         
 
-; buffer for itos subroutine
-; used to store result
-itos_buf: dw 6 dup(0)
 ; user input buffer
 input_buf: db 5,?,5 dup(0)
 ; stores the number that the player has to guess
@@ -14,6 +11,9 @@ secret: db 4 dup(0)
 ; reset input buffer
 ; used in "you won! restart?" prompt
 reset_buf: db 2,?,2 dup(0)
+; number buffer
+; used for outputting number of bulls and cows
+number_buf: db ?,'$'
 
 ; CONSTANTS
 ; DOS strings (terminated by $)
@@ -251,93 +251,27 @@ chkguess_ok:
 .incorrect:
     ; print bulls
     push ax
-    xor ah,ah
-    call itos
+    lea bx,number_buf
+    mov [bx],'0'
+    add [bx],al
     mov ah,9
     lea dx,newline
     int 21h
-    lea dx,itos_buf
+    lea dx,number_buf
     int 21h
     lea dx,guess_bulls
     int 21h
     pop ax
     ; print cows
-    mov al,ah
-    xor ah,ah
-    call itos
+    lea bx,number_buf
+    mov [bx],'0'
+    add [bx],ah
     mov ah,9
-    lea dx,itos_buf
+    lea dx,number_buf
     int 21h
     lea dx,guess_cows
     int 21h
     jmp guess_input
-
-; inputs:
-;   AX - number to convert
-; converts number to unsigned string, stored in itos_buf
-PROC itos
-    push ax
-    push bx
-    push cx
-    push dx
-    push di
-    push si
-    mov si,10
-    ; clear string buffer
-    lea di,itos_buf
-    mov cx,6
-.clrbuf:
-    mov b.[di],0
-    inc di
-    loop .clrbuf
-    
-    lea di,itos_buf
-    mov cx,1 ; flag to prevent printing 0s before number
-    mov bx,10000 ; divider
-    cmp ax,0
-    je .numzero
-.nextdgt:
-    ; if divider is 0, we're done
-    cmp bx,0
-    je .itosdone
-    ; prevent leading zeroes
-    cmp cx,0
-    je .calcdgt
-    ; if AX < BX, division result will be 0
-    cmp ax,bx
-    jb .skipdgt
-.calcdgt:
-    mov cx,0 ; set flag
-    mov dx,0
-    div bx ; AX = DX:AX / BX, DX = remainder
-    ; add last digit to buffer
-    ; AH is always 0, so it's ignored
-    add al,30h ; convert to ASCII code
-    mov b.[di],al
-    inc di
-    mov ax,dx ; get remainder from last DIV 
-.skipdgt:
-    ; calculate BX = BX / 10
-    push ax
-    mov dx,0
-    mov ax,bx
-    div si ; AX = DX:AX / 10, DX = remainder
-    mov bx,ax
-    pop ax
-    jmp .nextdgt
-.numzero:
-    mov b.[di],'0'
-    inc di
-.itosdone:
-    mov b.[di],'$'
-    pop si
-    pop di
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-ENDP itos
 
 ; push string_offset
 ; push string_length
