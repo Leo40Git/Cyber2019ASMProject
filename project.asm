@@ -342,7 +342,7 @@ ENDP itos
 ; push string_offset
 ; push string_length
 ; outputs:
-;    DL - 0 if string is number, 1 otherwise
+;    DL - 1 if string is number, 0 otherwise
 PROC is_number
     push bp
     mov bp,sp
