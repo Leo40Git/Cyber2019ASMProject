@@ -37,7 +37,7 @@ splash:
     db ' | \____/  \__,_||_||_||___/  \___/\/  \____/ \___/  \_/\_/  |___/ |',0Dh,0Ah
     db ' |                                                                 |',0Dh,0Ah
     db ' +-----------------------------------------------------------------+',0Dh,0Ah
-	db ' version 2.0',0Dh,0Ah
+    db ' version 2.0',0Dh,0Ah
     db 0Dh,0Ah
     db ' Programmed by Kfir Awad',0Dh,0Ah
     db ' for Cyber 2019 project',0Dh,0Ah
