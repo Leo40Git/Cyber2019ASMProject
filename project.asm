@@ -5,15 +5,20 @@
 ; VARIABLES         
 
 ; user input buffer
-input_buf: db 5,?,5 dup(0)
+input_buf db 5,?,5 dup(0)
 ; stores the number that the player has to guess
-secret: db 4 dup(0)
+secret db 4 dup(0)
 ; reset input buffer
 ; used in "you won! restart?" prompt
-reset_buf: db 2,?,2 dup(0)
+reset_buf db 2,?,2 dup(0)
 ; number buffer
 ; used for outputting number of bulls and cows
-number_buf: db ?,'$'
+number_buf db ?,'$'
+; guess counter
+guess_count db 0
+; guess count buffer
+; used for outputting number of guesses
+guess_count_buf db 4 dup(0)
 
 ; CONSTANTS
 ; DOS strings (terminated by $)
@@ -32,6 +37,7 @@ splash:
     db ' | \____/  \__,_||_||_||___/  \___/\/  \____/ \___/  \_/\_/  |___/ |',0Dh,0Ah
     db ' |                                                                 |',0Dh,0Ah
     db ' +-----------------------------------------------------------------+',0Dh,0Ah
+	db ' version 2.0',0Dh,0Ah
     db 0Dh,0Ah
     db ' Programmed by Kfir Awad',0Dh,0Ah
     db ' for Cyber 2019 project',0Dh,0Ah
@@ -40,7 +46,7 @@ splash:
 splash_2:
     db 'Press any key to start...$'
 secret_prompt:
-    db 'Enter your secret number (4 digits): $'
+    db 'Enter your secret number (4 digits, no duplicates): $'
 number_bad:
     db 0Dh,0Ah,'Follow the instructions!',0Dh,0Ah,'$'
 secret_ok:
@@ -50,11 +56,12 @@ secret_ok_2:
 secret_ok_3:
     db '1!$'
 guess_prompt:
-    db 'Guess the secret number (4 digits): $'
+    db 'Guess the secret number (4 digits, no duplicates): $'
 guess_bulls: db ' bulls, $'
 guess_cows: db ' cows',0Dh,0Ah,'$'
-guess_correct: db 0Dh,0Ah,'Congratulations! You guessed the secret!$'
-guess_correct_2: db 0Dh,0Ah,'Want to try again? (Y)es/(N)o: $'
+guess_correct: db 0Dh,0Ah,'Congratulations! You guessed the secret after $'
+guess_correct_2: db ' attempts!$'
+reset_prompt: db 0Dh,0Ah,'Want to try again? (Y)es/(N)o: $'
 
 ; - NOTES -
 ; wait (ah=86h,int=21h):
@@ -98,15 +105,20 @@ input_secret:
     lea dx,input_buf
     mov ah,0Ah
     int 21h
-    ; make sure we got a number
+    ; make sure we got a valid number
     lea dx,input_buf
     add dx,2 ; actual text starts 2 bytes after input_buf
     push dx
     push 4
     call is_number
     cmp dl,0
+    je chksec_bad
+    push dx
+    push 4
+    call has_duplicate_chars
+    cmp dl,0
     jne chksec_ok
-;chksec_bad:
+chksec_bad:
     ; show error
     lea dx,number_bad
     mov ah,9
@@ -130,6 +142,8 @@ chksec_ok:
     inc di
     dec cl
     jnz .cpyloop
+    ; reset guess counter
+    mov guess_count,0
     ; countdown
     lea dx,secret_ok
     mov ah,9
@@ -156,6 +170,11 @@ chksec_ok:
     mov ah,0
     int 10h
 guess_input:
+    ; increase number of guesses
+    lea bx,guess_count
+    mov al,[bx]
+    inc al
+    mov [bx],al
     ; display guess prompt
     lea dx,guess_prompt
     mov ah,9
@@ -172,8 +191,13 @@ chkguess:
     push 4
     call is_number
     cmp dl,0
+    je chkguess_bad
+    push dx
+    push 4
+    call has_duplicate_chars
+    cmp dl,0
     jne chkguess_ok
-;chkguess_bad:
+chkguess_bad:
     ; show error
     lea dx,number_bad
     mov ah,9
@@ -190,11 +214,11 @@ chkguess_ok:
     mov dx,0 ; dl - position in secret, dh - position in guess
 .check_loop:
     lea bx,secret ; bx - points to number at position (dl) in secret
-    mov ch,b.[di] ; ch - number at position (dh) in guess
+    mov ch,[di] ; ch - number at position (dh) in guess
     mov cl,4 ; cl - loop counter
     ; this loop checks if the number at position (dh) in guess is found in the secret
 .contain_chk:
-    cmp ch,b.[bx] ; compare secret with guess
+    cmp ch,[bx] ; compare secret with guess
     je .is_here ; if they're the same, we either have a cow or a bull
     inc bx
     inc dl
@@ -221,12 +245,27 @@ chkguess_ok:
     lea dx,guess_correct
     mov ah,9
     int 21h
+    ; print number of guesses
+    lea bx,guess_count
+    mov al,[bx]
+    lea bx,guess_count_buf
+    mov [bx],'0'
+    add [bx],al
+    inc bx
+    mov [bx],'$'
+    lea dx,guess_count_buf
+    mov ah,9
+    int 21h
+    ; print 2nd part of "you won!" message
+    lea dx,guess_correct_2
+    mov ah,9
+    int 21h
     mov cx,0Fh
     mov dx,4240h
     mov ah,86h
     int 15h
     ; show restart prompt
-    lea dx,guess_correct_2
+    lea dx,reset_prompt
     mov ah,9
     int 21h
     ; get choice
@@ -303,5 +342,78 @@ PROC is_number
     pop bp
     ret 4 ; sp += 4, removes parameters from stack
 ENDP is_number
+
+; push string_offset
+; push string_length
+; outputs:
+;    DL - 0 if string has duplicate characters, 1 otherwise
+PROC has_duplicate_chars
+    push bp
+    mov bp,sp
+    push si
+    push di
+    push ax
+    push bx
+    push cx
+    mov bx,[bp+6]
+    mov cx,[bp+4]
+    mov di,bx
+    mov si,cx
+    mov dl,0
+.chkloop2:
+    mov dh,[bx]
+    push di
+    push si
+    call count_char_times
+    cmp dl,1
+    ja .fail
+    inc bx
+    dec cx
+    jnz .chkloop2
+    mov dl,1
+    jmp .chkdone2
+.fail:
+    mov dl,0
+.chkdone2:
+    pop cx
+    pop bx
+    pop ax
+    pop di
+    pop si
+    pop bp
+    ret 4 ; sp += 4, removes parameters from stack
+ENDP
+
+; push string_offset
+; push string_length
+; inputs:
+;    DH - character to check
+; outputs:
+;    DL - number of times string contains character
+PROC count_char_times
+    push bp
+    mov bp,sp
+    push ax
+    push bx
+    push cx
+    mov bx,[bp+6]
+    mov cx,[bp+4]
+    inc cx ; loop (string_length + 1) times
+    mov dl,0
+.chkloop3:
+    cmp dh,[bx]
+    jne .nomatch
+    inc dl
+.nomatch:
+    inc bx
+    dec cx
+    jnz .chkloop3
+;.chkdone:
+    pop cx
+    pop bx
+    pop ax
+    pop bp
+    ret 4 ; sp += 4, removes parameters from stack
+ENDP
 
 END prog_start
